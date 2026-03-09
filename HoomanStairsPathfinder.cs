@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 using Timberborn.Navigation;
 using UnityEngine;
 
@@ -7,11 +8,11 @@ namespace Calloatti.HoomanStairs
   public static class HoomanStairsPathfinder
   {
     public static bool TryGenerateInternalPath(
+        Vector3Int? topPreOutside,
         Vector3Int topOutside,
         Vector3Int topInside,
         Vector3Int bottomInside,
         Vector3Int bottomOutside,
-        Vector2Int bridgeCol,
         HashSet<Vector2Int> topFootprint,
         HashSet<Vector2Int> bottomFootprint,
         out List<Vector3Int> gridPath,
@@ -19,6 +20,17 @@ namespace Calloatti.HoomanStairs
     {
       gridPath = new List<Vector3Int>();
       path = new List<Vector3>();
+
+      // Find the bridge column (intersection of footprints closest to topInside)
+      var intersection = topFootprint.Intersect(bottomFootprint).ToList();
+      if (intersection.Count == 0) return false;
+      Vector2Int bridgeCol = intersection.OrderBy(c => Vector2Int.Distance(c, new Vector2Int(topInside.x, topInside.y))).First();
+
+      // 0. Pre-Outside (if valid, prepend it to the path)
+      if (topPreOutside.HasValue)
+      {
+        AddNode(topPreOutside.Value, gridPath, path);
+      }
 
       // 1. Outside to Inside
       AddNode(topOutside, gridPath, path);

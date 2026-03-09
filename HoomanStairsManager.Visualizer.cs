@@ -81,6 +81,12 @@ namespace Calloatti.HoomanStairs
           }
         }
       }
+
+      void OnDestroy()
+      {
+        if (_cubeWireMesh != null) Destroy(_cubeWireMesh);
+        if (_mat != null) Destroy(_mat);
+      }
     }
   }
 }

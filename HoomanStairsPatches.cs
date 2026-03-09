@@ -31,6 +31,8 @@ namespace Calloatti.HoomanStairs
       }
     }
 
+    /*
+    // Commented out to prevent conflict with HoomanStairsManager caching the un-shifted road node
     [HarmonyPatch(typeof(Accessible), nameof(Accessible.SetAccesses))]
     [HarmonyPrefix]
     public static void SetAccesses_Prefix(Accessible __instance, ref IEnumerable<Vector3> accesses)
@@ -52,5 +54,6 @@ namespace Calloatti.HoomanStairs
         }
       }
     }
+    */
   }
 }
