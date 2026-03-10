@@ -28,6 +28,9 @@ namespace Calloatti.HoomanStairs
     // Registramos los edificios superiores para cambiarles la puerta hacia adentro
     public static readonly HashSet<BlockObject> TopBuildings = new HashSet<BlockObject>();
 
+    // NEW: Save the exact pair of coordinates for the visual path connection
+    public static readonly HashSet<EdgeKey> FakePathEdges = new HashSet<EdgeKey>();
+
     public static void AddNode(int id)
     {
       if (!StairNodeIds.ContainsKey(id)) StairNodeIds[id] = 0;

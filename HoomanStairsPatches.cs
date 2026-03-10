@@ -1,7 +1,9 @@
-﻿using System.Collections.Generic;
-using HarmonyLib;
+﻿using HarmonyLib;
+using System.Collections.Generic;
 using Timberborn.BlockSystem;
+using Timberborn.EnterableSystem;
 using Timberborn.Navigation;
+using Timberborn.SlotSystem;
 using UnityEngine;
 
 namespace Calloatti.HoomanStairs
@@ -28,6 +30,30 @@ namespace Calloatti.HoomanStairs
       if (__result && HoomanStairsRegistry.StairNodeIds.ContainsKey(nodeId))
       {
         __result = false;
+      }
+    }
+
+    // FIX: Vanilla Edge-Case Crash
+    // If a building's visual slots are disabled (e.g., by clipping into adjacent stacked walls), 
+    // FixedSlotManager natively crashes. We bypass the crash and let SlotManager use its native unassigned pool.
+    [HarmonyPatch(typeof(FixedSlotManager), "OnEntererAdded")]
+    [HarmonyPrefix]
+    public static bool FixedSlotManager_OnEntererAdded_Prefix(FixedSlotManager __instance, object sender, EntererAddedEventArgs e, SlotManager ____slotManager)
+    {
+      // ____slotManager allows us to safely access the private _slotManager field
+      ____slotManager.AddEnterer(e.Enterer);
+      return false; // Skip the original method so it never throws the exception
+    }
+
+    [HarmonyPatch("Timberborn.PathSystem.ConnectionService", "IsEntranceInDirectionAt")]
+    [HarmonyPostfix]
+    public static void IsEntranceInDirectionAt_Postfix(Vector3Int entranceCoordinates, Vector3Int doorstepCoordinates, ref bool __result)
+    {
+      if (__result) return;
+
+      if (HoomanStairsRegistry.FakePathEdges.Contains(new EdgeKey(entranceCoordinates, doorstepCoordinates)))
+      {
+        __result = true;
       }
     }
 

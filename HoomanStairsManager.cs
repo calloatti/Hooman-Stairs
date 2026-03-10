@@ -2,12 +2,14 @@
 using HarmonyLib;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using Timberborn.BlockSystem;
 using Timberborn.BuildingsNavigation;
 using Timberborn.Coordinates;
 using Timberborn.EntitySystem;
 using Timberborn.Navigation;
+using Timberborn.PlayerDataSystem;
 using Timberborn.SingletonSystem;
 using Timberborn.TerrainSystem;
 using Timberborn.UILayoutSystem;
@@ -21,6 +23,7 @@ namespace Calloatti.HoomanStairs
     public BlockObject BottomBuilding;
     public List<Vector3Int> GridPath;
     public List<NavMeshEdge> InjectedEdges = new List<NavMeshEdge>();
+    public EdgeKey FakePathEdge;
   }
 
   public partial class HoomanStairsManager : IPostLoadableSingleton, IDisposable
@@ -64,6 +67,7 @@ namespace Calloatti.HoomanStairs
 
     public void PostLoad()
     {
+      LoadDebugSettings();
       _rendererHolder = new GameObject("HoomanStairsRenderer");
       _renderer = _rendererHolder.AddComponent<PathRenderer>();
       _eventBus.Register(this);
@@ -74,6 +78,35 @@ namespace Calloatti.HoomanStairs
       _eventBus.Unregister(this);
       if (_rendererHolder != null) UnityEngine.Object.Destroy(_rendererHolder);
       CleanupAllConnections();
+    }
+
+    private void LoadDebugSettings()
+    {
+      string configPath = Path.Combine(PlayerDataFileService.PlayerDataDirectory, "HoomanStairs.txt");
+
+      if (File.Exists(configPath))
+      {
+        string[] lines = File.ReadAllLines(configPath);
+        foreach (var line in lines)
+        {
+          var parts = line.Split('=');
+          if (parts.Length == 2)
+          {
+            string key = parts[0].Trim();
+            if (bool.TryParse(parts[1].Trim(), out bool value))
+            {
+              if (key == "DebugNodes") _debugNodes = value;
+              if (key == "DebugLines") _debugLines = value;
+              if (key == "DebugCarving") _debugCarving = value;
+            }
+          }
+        }
+      }
+      else
+      {
+        Directory.CreateDirectory(PlayerDataFileService.PlayerDataDirectory);
+        File.WriteAllText(configPath, "DebugNodes=false\nDebugLines=false\nDebugCarving=false");
+      }
     }
 
     [OnEvent]
@@ -119,11 +152,9 @@ namespace Calloatti.HoomanStairs
 
     private void ScanTargetBuilding(BlockObject topBuilding)
     {
-      // GUARD 1: Only buildings we care about, and only if they have an entrance
       if (!IsTopValidBuilding(topBuilding) || topBuilding.PositionedEntrance == null) return;
       if (_activeConnections.Any(c => c.TopBuilding == topBuilding)) return;
 
-      // --- PRE-SCAN: Check for a building below BEFORE modifying anything ---
       var footprint = topBuilding.PositionedBlocks.GetOccupiedCoordinates().ToList();
       if (footprint.Count == 0) return;
 
@@ -134,7 +165,6 @@ namespace Calloatti.HoomanStairs
           .Where(below => below != null && below != topBuilding && below.IsFinished && below.PositionedEntrance != null && IsBottomValidBuilding(below))
           .ToList();
 
-      // GUARD 2: If no valid building below, exit. Do not touch District Centers or Piles.
       if (candidates.Count == 0) return;
 
       float avgX = (float)candidates.Average(c => c.Coordinates.x);
@@ -144,18 +174,13 @@ namespace Calloatti.HoomanStairs
       var bottomFootprint = centralBelow.PositionedBlocks.GetOccupiedCoordinates().ToList();
       var intersection = footprint.Select(c => new Vector2Int(c.x, c.y)).Intersect(bottomFootprint.Select(c => new Vector2Int(c.x, c.y))).ToList();
 
-      // GUARD 3: Must have an intersection to form a "staircase"
       if (intersection.Count == 0) return;
 
-      // --- RECORD PRE-OUTSIDE ---
-      // Check if the tile directly beneath the original door coordinates is valid solid ground or a solid building
       Vector3Int topPreOutsideRaw = topBuilding.PositionedEntrance.Coordinates;
       Vector3Int belowPreOutside = topPreOutsideRaw + new Vector3Int(0, 0, -1);
       bool isWalkable = _terrainService.Underground(belowPreOutside) || _stackableBlockService.IsStackableBlockAt(belowPreOutside);
       Vector3Int? topPreOutside = isWalkable ? (Vector3Int?)topPreOutsideRaw : null;
 
-      // --- THE SHIFT (Just-In-Time) ---
-      // We only reach this point if we are 100% sure we are making a stair connection
       var removeMethod = AccessTools.Method(typeof(BlockObject), "RemoveFromService");
       var addMethod = AccessTools.Method(typeof(BlockObject), "AddToService");
 
@@ -174,7 +199,6 @@ namespace Calloatti.HoomanStairs
 
       addMethod?.Invoke(topBuilding, null);
 
-      // --- CONTINUE WITH PATHFINDING ---
       Vector3Int topInside = topBuilding.PositionedEntrance.DoorstepCoordinates;
       Vector3Int topOutside = topBuilding.PositionedEntrance.Coordinates;
 
@@ -190,11 +214,14 @@ namespace Calloatti.HoomanStairs
           top2DFootprint, bottom2DFootprint,
           out List<Vector3Int> gridPath, out List<Vector3> path))
       {
-        //RevertBuildingEntrance(topBuilding);
         return;
       }
 
       StairConnection conn = new StairConnection { TopBuilding = topBuilding, BottomBuilding = centralBelow, GridPath = gridPath };
+
+      conn.FakePathEdge = new EdgeKey(topPreOutsideRaw, topPreOutsideRaw - offset);
+      HoomanStairsRegistry.FakePathEdges.Add(conn.FakePathEdge);
+
       _activeConnections.Add(conn);
 
       foreach (var node in gridPath)
@@ -230,6 +257,8 @@ namespace Calloatti.HoomanStairs
       RefreshBuildingNavMesh(topBuilding);
       RefreshBuildingNavMesh(centralBelow);
 
+      LogBuildingHierarchy(topBuilding);
+
       if (_renderer != null) _renderer.UpdatePathData(topBuilding, path, _debugNodes, _debugLines, _debugCarving);
     }
 
@@ -240,7 +269,6 @@ namespace Calloatti.HoomanStairs
         var conn = _activeConnections[i];
         if (conn.TopBuilding == blockObject || conn.BottomBuilding == blockObject)
         {
-          // 1. Clean up NavMesh edges and Registry nodes
           foreach (var edge in conn.InjectedEdges) _navMeshService.RemoveEdge(edge);
           foreach (var node in conn.GridPath)
           {
@@ -251,38 +279,10 @@ namespace Calloatti.HoomanStairs
             HoomanStairsRegistry.RemoveEdge(new EdgeKey(conn.GridPath[j], conn.GridPath[j + 1]));
           }
 
-          // 2. Stop the AI from looking for the faked internal flow field
-          if (conn.TopBuilding != null)
-          {
-            //_navigationCachingService.StopCachingRoadFlowField(conn.TopBuilding.PositionedEntrance.Coordinates);
-          }
-
-          // 3. Cleanup our Registry trackers
           HoomanStairsRegistry.TopBuildings.Remove(conn.TopBuilding);
-
-          // 4. We DO NOT call RevertBuildingEntrance here. 
-          // Since the top building is being deleted, we let the vanilla 
-          // destruction process finish without interfering with the ComponentCache.
-
+          HoomanStairsRegistry.FakePathEdges.Remove(conn.FakePathEdge);
           _activeConnections.RemoveAt(i);
         }
-      }
-    }
-    private void RevertBuildingEntrance(BlockObject topBuilding)
-    {
-      var removeMethod = AccessTools.Method(typeof(BlockObject), "RemoveFromService");
-      var updateMethod = AccessTools.Method(typeof(BlockObject), "UpdateTransformedBlocks");
-      var addMethod = AccessTools.Method(typeof(BlockObject), "AddToService");
-
-      removeMethod?.Invoke(topBuilding, null);
-      updateMethod?.Invoke(topBuilding, null);
-      addMethod?.Invoke(topBuilding, null);
-
-      var buildingAcc = topBuilding.GetComponent<Timberborn.Buildings.BuildingAccessible>();
-      if (buildingAcc != null && buildingAcc.Accessible != null && topBuilding.PositionedEntrance != null)
-      {
-        Vector3 outside = NavigationCoordinateSystem.GridToWorld(topBuilding.PositionedEntrance.DoorstepCoordinates);
-        buildingAcc.Accessible.SetAccesses(new List<Vector3> { outside });
       }
     }
 
@@ -296,6 +296,7 @@ namespace Calloatti.HoomanStairs
       HoomanStairsRegistry.StairNodeIds.Clear();
       HoomanStairsRegistry.TunnelEdges.Clear();
       HoomanStairsRegistry.TopBuildings.Clear();
+      HoomanStairsRegistry.FakePathEdges.Clear();
     }
 
     private void RefreshBuildingNavMesh(BlockObject building)
@@ -318,5 +319,22 @@ namespace Calloatti.HoomanStairs
         b.HasComponent<Timberborn.DwellingSystem.Dwelling>() ||
         b.HasComponent<Timberborn.WorkSystem.Workplace>() ||
         b.HasComponent<Timberborn.Stockpiles.Stockpile>();
+
+    private void LogBuildingHierarchy(BlockObject building)
+    {
+      Debug.Log($"[HoomanStairs] === START HIERARCHY DUMP FOR: {building.Name} ===");
+
+      // Grab every single piece of the 3D model, even the hidden ones
+      Transform[] allChildren = building.GameObject.GetComponentsInChildren<Transform>(true);
+
+      foreach (Transform child in allChildren)
+      {
+        // Log the name of the piece and its direct parent so you know where it lives
+        string parentName = child.parent != null ? child.parent.name : "ROOT";
+        Debug.Log($"[HoomanStairs] Parent: {parentName} | Object: {child.name}");
+      }
+
+      Debug.Log($"[HoomanStairs] === END HIERARCHY DUMP ===");
+    }
   }
 }
