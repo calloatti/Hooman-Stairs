@@ -11,16 +11,23 @@ namespace Calloatti.HoomanStairs
   [HarmonyPatch]
   public static class HoomanStairsPatches
   {
-    [HarmonyPatch(typeof(NavMeshObject), nameof(NavMeshObject.BlockEdge))]
+    // FIX: Use string-based patching because NavMeshSource is 'internal'
+    // This targets Timberborn.Navigation.NavMeshSource.BlockEdge(int, int, int)
+    [HarmonyPatch("Timberborn.Navigation.NavMeshSource", "BlockEdge")]
     [HarmonyPrefix]
-    public static bool BlockEdge_Prefix(NavMeshEdge navMeshEdge)
+    public static bool BlockEdge_Source_Prefix(int startNodeId, int endNodeId, int groupId)
     {
-      EdgeKey key = new EdgeKey(navMeshEdge.Start, navMeshEdge.End);
-      if (HoomanStairsRegistry.TunnelEdges.ContainsKey(key))
-      {
-        return false;
-      }
-      return true;
+      // If it belongs to our custom group, ignore the request entirely.
+      return groupId != HoomanStairsManager.StairsGroupId;
+    }
+
+    // FIX: Mirror the block logic to prevent the "it wasn't blocked" exception
+    // Targets Timberborn.Navigation.NavMeshSource.UnblockEdge(int, int, int)
+    [HarmonyPatch("Timberborn.Navigation.NavMeshSource", "UnblockEdge")]
+    [HarmonyPrefix]
+    public static bool UnblockEdge_Source_Prefix(int startNodeId, int endNodeId, int groupId)
+    {
+      return groupId != HoomanStairsManager.StairsGroupId;
     }
 
     [HarmonyPatch("Timberborn.Navigation.DistrictObstacleService", "IsSetObstacle")]

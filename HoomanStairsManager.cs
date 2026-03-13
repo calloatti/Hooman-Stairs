@@ -28,6 +28,9 @@ namespace Calloatti.HoomanStairs
 
   public partial class HoomanStairsManager : IPostLoadableSingleton, IDisposable
   {
+    // FIX 1: Initialize to -1 so it doesn't accidentally match Group 0 on map load
+    public static int StairsGroupId { get; private set; } = -1;
+
     private readonly IBlockService _blockService;
     private readonly ITerrainService _terrainService;
     private readonly StackableBlockService _stackableBlockService;
@@ -70,6 +73,9 @@ namespace Calloatti.HoomanStairs
       LoadDebugSettings();
       _rendererHolder = new GameObject("HoomanStairsRenderer");
       _renderer = _rendererHolder.AddComponent<PathRenderer>();
+
+      StairsGroupId = _navMeshGroupService.GetOrAddGroupId("HoomanStairs");
+
       _eventBus.Register(this);
     }
 
@@ -188,6 +194,7 @@ namespace Calloatti.HoomanStairs
 
       Vector3Int offset = topBuilding.PositionedEntrance.Direction2D.ToOffset();
       Vector3Int deepInside = topBuilding.PositionedEntrance.Coordinates - offset;
+      
 
       var constructor = AccessTools.Constructor(typeof(PositionedEntrance), new Type[] { typeof(Vector3Int), typeof(Timberborn.Coordinates.Direction2D) });
       if (constructor != null)
@@ -228,16 +235,13 @@ namespace Calloatti.HoomanStairs
       {
         if (IsInNavMesh(node)) HoomanStairsRegistry.AddNode(GetNodeId(node));
       }
-      for (int i = 0; i < gridPath.Count - 1; i++)
-      {
-        HoomanStairsRegistry.AddEdge(new EdgeKey(gridPath[i], gridPath[i + 1]));
-      }
 
-      int group = _navMeshGroupService.GetDefaultGroupId();
+      int group = StairsGroupId;
       for (int i = 0; i < gridPath.Count - 1; i++)
       {
-        var eDown = NavMeshEdge.CreateGrouped(gridPath[i], gridPath[i + 1], group, true, 1.0f);
-        var eUp = NavMeshEdge.CreateGrouped(gridPath[i + 1], gridPath[i], group, true, 1.0f);
+        // FIX 2: Set cost to 0.5f so this custom edge ALWAYS wins ties against vanilla dirt paths!
+        var eDown = NavMeshEdge.CreateGrouped(gridPath[i], gridPath[i + 1], group, true, 0.6f);
+        var eUp = NavMeshEdge.CreateGrouped(gridPath[i + 1], gridPath[i], group, true, 0.8f);
         _navMeshService.AddEdge(eDown);
         _navMeshService.AddEdge(eUp);
         conn.InjectedEdges.Add(eDown);
@@ -274,10 +278,6 @@ namespace Calloatti.HoomanStairs
           {
             if (IsInNavMesh(node)) HoomanStairsRegistry.RemoveNode(GetNodeId(node));
           }
-          for (int j = 0; j < conn.GridPath.Count - 1; j++)
-          {
-            HoomanStairsRegistry.RemoveEdge(new EdgeKey(conn.GridPath[j], conn.GridPath[j + 1]));
-          }
 
           HoomanStairsRegistry.TopBuildings.Remove(conn.TopBuilding);
           HoomanStairsRegistry.FakePathEdges.Remove(conn.FakePathEdge);
@@ -294,7 +294,6 @@ namespace Calloatti.HoomanStairs
       }
       _activeConnections.Clear();
       HoomanStairsRegistry.StairNodeIds.Clear();
-      HoomanStairsRegistry.TunnelEdges.Clear();
       HoomanStairsRegistry.TopBuildings.Clear();
       HoomanStairsRegistry.FakePathEdges.Clear();
     }
@@ -322,19 +321,19 @@ namespace Calloatti.HoomanStairs
 
     private void LogBuildingHierarchy(BlockObject building)
     {
-      Debug.Log($"[HoomanStairs] === START HIERARCHY DUMP FOR: {building.Name} ===");
+      //Debug.Log($"[HoomanStairs] === START HIERARCHY DUMP FOR: {building.Name} ===");
 
-      // Grab every single piece of the 3D model, even the hidden ones
-      Transform[] allChildren = building.GameObject.GetComponentsInChildren<Transform>(true);
+      //// Grab every single piece of the 3D model, even the hidden ones
+      //Transform[] allChildren = building.GameObject.GetComponentsInChildren<Transform>(true);
 
-      foreach (Transform child in allChildren)
-      {
-        // Log the name of the piece and its direct parent so you know where it lives
-        string parentName = child.parent != null ? child.parent.name : "ROOT";
-        Debug.Log($"[HoomanStairs] Parent: {parentName} | Object: {child.name}");
-      }
+      //foreach (Transform child in allChildren)
+      //{
+      //  // Log the name of the piece and its direct parent so you know where it lives
+      //  string parentName = child.parent != null ? child.parent.name : "ROOT";
+      //  Debug.Log($"[HoomanStairs] Parent: {parentName} | Object: {child.name}");
+      //}
 
-      Debug.Log($"[HoomanStairs] === END HIERARCHY DUMP ===");
+      //Debug.Log($"[HoomanStairs] === END HIERARCHY DUMP ===");
     }
   }
 }

@@ -21,10 +21,16 @@ namespace Calloatti.HoomanStairs
       gridPath = new List<Vector3Int>();
       path = new List<Vector3>();
 
-      // Find the bridge column (intersection of footprints closest to topInside)
+      // Find the bridge column (intersection of footprints)
       var intersection = topFootprint.Intersect(bottomFootprint).ToList();
       if (intersection.Count == 0) return false;
-      Vector2Int bridgeCol = intersection.OrderBy(c => Vector2Int.Distance(c, new Vector2Int(topInside.x, topInside.y))).First();
+
+      // Prefer going down in the center: maximize neighbors in the footprints, then farthest from the door
+      Vector2Int topInside2D = new Vector2Int(topInside.x, topInside.y);
+      Vector2Int bridgeCol = intersection
+          .OrderByDescending(c => GetNeighborCount(c, topFootprint) + GetNeighborCount(c, bottomFootprint))
+          .ThenByDescending(c => Vector2Int.Distance(c, topInside2D))
+          .First();
 
       // 0. Pre-Outside (if valid, prepend it to the path)
       if (topPreOutside.HasValue)
@@ -69,6 +75,16 @@ namespace Calloatti.HoomanStairs
       AddNode(bottomOutside, gridPath, path);
 
       return true;
+    }
+
+    private static int GetNeighborCount(Vector2Int pos, HashSet<Vector2Int> footprint)
+    {
+      int count = 0;
+      if (footprint.Contains(new Vector2Int(pos.x + 1, pos.y))) count++;
+      if (footprint.Contains(new Vector2Int(pos.x - 1, pos.y))) count++;
+      if (footprint.Contains(new Vector2Int(pos.x, pos.y + 1))) count++;
+      if (footprint.Contains(new Vector2Int(pos.x, pos.y - 1))) count++;
+      return count;
     }
 
     // Pure BFS: Will never step outside the footprint.

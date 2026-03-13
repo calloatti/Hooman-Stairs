@@ -1,14 +1,9 @@
 {
   "Name": "Hooman Stairs",
-  "Version": "1.0.1",
+  "Version": "1.0.5",
   "Id": "Calloatti.HoomanStairs",
   "MinimumGameVersion": "1.0.0.0",
   "Description": "Buildings now have hooman stairs inside",
-  "RequiredMods": [
-    {
-      "Id": "Harmony",
-      "MinVersion": "2.4.1"
-    }
-	],
+  "RequiredMods": [{"Id": "Harmony", "MinVersion": "2.4.1"}],
   "OptionalMods": []
 }

@@ -11,7 +11,7 @@ namespace Calloatti.HoomanStairs
 
     protected override void Configure()
     {
-      Debug.Log($"{Prefix} Configurator: Initializing Systems...");
+      Debug.Log($"{Prefix} Configurator: Initializing...");
 
       // Bind the partial HoomanStairsManager as the Game Singleton
       Bind<HoomanStairsManager>().AsSingleton();

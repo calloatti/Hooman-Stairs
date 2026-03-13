@@ -23,7 +23,6 @@ namespace Calloatti.HoomanStairs
   {
     // Usamos diccionarios para contar cuántas escaleras usan el mismo nodo/arista
     public static readonly Dictionary<int, int> StairNodeIds = new Dictionary<int, int>();
-    public static readonly Dictionary<EdgeKey, int> TunnelEdges = new Dictionary<EdgeKey, int>();
 
     // Registramos los edificios superiores para cambiarles la puerta hacia adentro
     public static readonly HashSet<BlockObject> TopBuildings = new HashSet<BlockObject>();
@@ -43,21 +42,6 @@ namespace Calloatti.HoomanStairs
       {
         StairNodeIds[id]--;
         if (StairNodeIds[id] <= 0) StairNodeIds.Remove(id);
-      }
-    }
-
-    public static void AddEdge(EdgeKey key)
-    {
-      if (!TunnelEdges.ContainsKey(key)) TunnelEdges[key] = 0;
-      TunnelEdges[key]++;
-    }
-
-    public static void RemoveEdge(EdgeKey key)
-    {
-      if (TunnelEdges.ContainsKey(key))
-      {
-        TunnelEdges[key]--;
-        if (TunnelEdges[key] <= 0) TunnelEdges.Remove(key);
       }
     }
   }
