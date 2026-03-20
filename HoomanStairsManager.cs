@@ -250,6 +250,7 @@ namespace Calloatti.HoomanStairs
 
       HoomanStairsRegistry.TopBuildings.Add(topBuilding);
       _navigationCachingService.StartCachingRoadFlowField(topOutside);
+      _navigationCachingService.StartCachingTerrainFlowField(topOutside);
 
       var buildingAccessible = topBuilding.GetComponent<Timberborn.Buildings.BuildingAccessible>();
       if (buildingAccessible != null && buildingAccessible.Accessible != null)
@@ -279,13 +280,18 @@ namespace Calloatti.HoomanStairs
             if (IsInNavMesh(node)) HoomanStairsRegistry.RemoveNode(GetNodeId(node));
           }
 
+          // --- ADD THESE CACHE CLEANUP LINES ---
+          Vector3Int topOutside = conn.TopBuilding.PositionedEntrance.Coordinates;
+          _navigationCachingService.StopCachingRoadFlowField(topOutside);
+          _navigationCachingService.StopCachingTerrainFlowField(topOutside);
+          // -------------------------------------
+
           HoomanStairsRegistry.TopBuildings.Remove(conn.TopBuilding);
           HoomanStairsRegistry.FakePathEdges.Remove(conn.FakePathEdge);
           _activeConnections.RemoveAt(i);
         }
       }
     }
-
     private void CleanupAllConnections()
     {
       foreach (var conn in _activeConnections)
