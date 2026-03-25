@@ -15,14 +15,15 @@ namespace Calloatti.HoomanStairs
         Vector3Int bottomOutside,
         HashSet<Vector2Int> topFootprint,
         HashSet<Vector2Int> bottomFootprint,
+        HashSet<Vector2Int> validDropColumns, // NEW: Safe drop zones!
         out List<Vector3Int> gridPath,
         out List<Vector3> path)
     {
       gridPath = new List<Vector3Int>();
       path = new List<Vector3>();
 
-      // Find the bridge column (intersection of footprints)
-      var intersection = topFootprint.Intersect(bottomFootprint).ToList();
+      // NEW: Only allow the bridge column to occur inside safely pre-checked columns!
+      var intersection = validDropColumns.Intersect(bottomFootprint).ToList();
       if (intersection.Count == 0) return false;
 
       // Prefer going down in the center: maximize neighbors in the footprints, then farthest from the door

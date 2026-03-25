@@ -165,11 +165,46 @@ namespace Calloatti.HoomanStairs
       if (footprint.Count == 0) return;
 
       int lowestZ = footprint.Min(c => c.z);
-      var candidates = footprint
-          .Where(c => c.z == lowestZ)
-          .Select(coord => _blockService.GetBottomObjectAt(new Vector3Int(coord.x, coord.y, lowestZ - 1)))
-          .Where(below => below != null && below != topBuilding && below.IsFinished && below.PositionedEntrance != null && IsBottomValidBuilding(below))
-          .ToList();
+      var candidates = new List<BlockObject>();
+
+      // NEW: Track exactly which X,Y columns reached each specific bottom building safely
+      var validDropColumnsByCandidate = new Dictionary<BlockObject, HashSet<Vector2Int>>();
+
+      foreach (var coord in footprint.Where(c => c.z == lowestZ))
+      {
+        int checkZ = lowestZ - 1;
+        while (checkZ >= 0)
+        {
+          var below = _blockService.GetBottomObjectAt(new Vector3Int(coord.x, coord.y, checkZ));
+
+          if (below == null) break;
+          if (below == topBuilding)
+          {
+            checkZ--;
+            continue;
+          }
+
+          if (IsIntermediateRoof(below))
+          {
+            checkZ = below.Coordinates.z - 1;
+            continue;
+          }
+
+          if (below.IsFinished && below.PositionedEntrance != null && IsBottomValidBuilding(below))
+          {
+            candidates.Add(below);
+
+            // Record this specific column as a safe path to this bottom building
+            if (!validDropColumnsByCandidate.ContainsKey(below))
+            {
+              validDropColumnsByCandidate[below] = new HashSet<Vector2Int>();
+            }
+            validDropColumnsByCandidate[below].Add(new Vector2Int(coord.x, coord.y));
+          }
+
+          break;
+        }
+      }
 
       if (candidates.Count == 0) return;
 
@@ -178,9 +213,7 @@ namespace Calloatti.HoomanStairs
       BlockObject centralBelow = candidates.OrderBy(c => Mathf.Pow(c.Coordinates.x - avgX, 2) + Mathf.Pow(c.Coordinates.y - avgY, 2)).First();
 
       var bottomFootprint = centralBelow.PositionedBlocks.GetOccupiedCoordinates().ToList();
-      var intersection = footprint.Select(c => new Vector2Int(c.x, c.y)).Intersect(bottomFootprint.Select(c => new Vector2Int(c.x, c.y))).ToList();
-
-      if (intersection.Count == 0) return;
+      var validDropColumns = validDropColumnsByCandidate[centralBelow];
 
       Vector3Int topPreOutsideRaw = topBuilding.PositionedEntrance.Coordinates;
       Vector3Int belowPreOutside = topPreOutsideRaw + new Vector3Int(0, 0, -1);
@@ -194,7 +227,7 @@ namespace Calloatti.HoomanStairs
 
       Vector3Int offset = topBuilding.PositionedEntrance.Direction2D.ToOffset();
       Vector3Int deepInside = topBuilding.PositionedEntrance.Coordinates - offset;
-      
+
 
       var constructor = AccessTools.Constructor(typeof(PositionedEntrance), new Type[] { typeof(Vector3Int), typeof(Timberborn.Coordinates.Direction2D) });
       if (constructor != null)
@@ -214,11 +247,12 @@ namespace Calloatti.HoomanStairs
       HashSet<Vector2Int> bottom2DFootprint = new HashSet<Vector2Int>();
       foreach (var c in bottomFootprint) bottom2DFootprint.Add(new Vector2Int(c.x, c.y));
 
+      // Pass the safe validDropColumns to the pathfinder
       if (!HoomanStairsPathfinder.TryGenerateInternalPath(
           topPreOutside, topOutside, topInside,
           centralBelow.PositionedEntrance.DoorstepCoordinates,
           centralBelow.PositionedEntrance.Coordinates,
-          top2DFootprint, bottom2DFootprint,
+          top2DFootprint, bottom2DFootprint, validDropColumns,
           out List<Vector3Int> gridPath, out List<Vector3> path))
       {
         return;
@@ -239,7 +273,6 @@ namespace Calloatti.HoomanStairs
       int group = StairsGroupId;
       for (int i = 0; i < gridPath.Count - 1; i++)
       {
-        // FIX 2: Set cost to 0.5f so this custom edge ALWAYS wins ties against vanilla dirt paths!
         var eDown = NavMeshEdge.CreateGrouped(gridPath[i], gridPath[i + 1], group, true, 0.6f);
         var eUp = NavMeshEdge.CreateGrouped(gridPath[i + 1], gridPath[i], group, true, 0.8f);
         _navMeshService.AddEdge(eDown);
@@ -262,8 +295,6 @@ namespace Calloatti.HoomanStairs
       RefreshBuildingNavMesh(topBuilding);
       RefreshBuildingNavMesh(centralBelow);
 
-      LogBuildingHierarchy(topBuilding);
-
       if (_renderer != null) _renderer.UpdatePathData(topBuilding, path, _debugNodes, _debugLines, _debugCarving);
     }
 
@@ -280,11 +311,9 @@ namespace Calloatti.HoomanStairs
             if (IsInNavMesh(node)) HoomanStairsRegistry.RemoveNode(GetNodeId(node));
           }
 
-          // --- ADD THESE CACHE CLEANUP LINES ---
           Vector3Int topOutside = conn.TopBuilding.PositionedEntrance.Coordinates;
           _navigationCachingService.StopCachingRoadFlowField(topOutside);
           _navigationCachingService.StopCachingTerrainFlowField(topOutside);
-          // -------------------------------------
 
           HoomanStairsRegistry.TopBuildings.Remove(conn.TopBuilding);
           HoomanStairsRegistry.FakePathEdges.Remove(conn.FakePathEdge);
@@ -292,6 +321,7 @@ namespace Calloatti.HoomanStairs
         }
       }
     }
+
     private void CleanupAllConnections()
     {
       foreach (var conn in _activeConnections)
@@ -325,21 +355,14 @@ namespace Calloatti.HoomanStairs
         b.HasComponent<Timberborn.WorkSystem.Workplace>() ||
         b.HasComponent<Timberborn.Stockpiles.Stockpile>();
 
-    private void LogBuildingHierarchy(BlockObject building)
+    private bool IsIntermediateRoof(BlockObject b)
     {
-      //Debug.Log($"[HoomanStairs] === START HIERARCHY DUMP FOR: {building.Name} ===");
+      if (b.TryGetComponent<Timberborn.TemplateSystem.TemplateSpec>(out var templateSpec))
+      {
+        return templateSpec.TemplateName == "Roof3x2.Folktails" || templateSpec.TemplateName == "Roof3x2.IronTeeth";
+      }
 
-      //// Grab every single piece of the 3D model, even the hidden ones
-      //Transform[] allChildren = building.GameObject.GetComponentsInChildren<Transform>(true);
-
-      //foreach (Transform child in allChildren)
-      //{
-      //  // Log the name of the piece and its direct parent so you know where it lives
-      //  string parentName = child.parent != null ? child.parent.name : "ROOT";
-      //  Debug.Log($"[HoomanStairs] Parent: {parentName} | Object: {child.name}");
-      //}
-
-      //Debug.Log($"[HoomanStairs] === END HIERARCHY DUMP ===");
+      return b.Name.Contains("Roof3x2.Folktails") || b.Name.Contains("Roof3x2.IronTeeth");
     }
   }
 }

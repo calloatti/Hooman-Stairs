@@ -5,13 +5,12 @@ using UnityEngine;
 namespace Calloatti.HoomanStairs
 {
   [Context("Game")]
-  public class HoomanStairsConfigurator : Configurator
+  public class ModConfigurator : Configurator
   {
-    public static readonly string Prefix = "[HoomanStairs]";
 
     protected override void Configure()
     {
-      Debug.Log($"{Prefix} Configurator: Initializing...");
+      Debug.Log("[HoomanStairs] Configurator.Configure");
 
       // Bind the partial HoomanStairsManager as the Game Singleton
       Bind<HoomanStairsManager>().AsSingleton();
