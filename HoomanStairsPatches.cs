@@ -1,8 +1,10 @@
 ﻿using HarmonyLib;
+using System;
 using System.Collections.Generic;
 using Timberborn.BlockSystem;
 using Timberborn.EnterableSystem;
 using Timberborn.Navigation;
+using Timberborn.PathSystem; // Added so we can access ConnectionService directly
 using Timberborn.SlotSystem;
 using UnityEngine;
 
@@ -11,9 +13,8 @@ namespace Calloatti.HoomanStairs
   [HarmonyPatch]
   public static class HoomanStairsPatches
   {
-    // FIX: Use string-based patching because NavMeshSource is 'internal'
-    // This targets Timberborn.Navigation.NavMeshSource.BlockEdge(int, int, int)
-    [HarmonyPatch("Timberborn.Navigation.NavMeshSource", "BlockEdge")]
+    // Strongly-typed patch for NavMeshSource.BlockEdge
+    [HarmonyPatch(typeof(NavMeshSource), nameof(NavMeshSource.BlockEdge))]
     [HarmonyPrefix]
     public static bool BlockEdge_Source_Prefix(int startNodeId, int endNodeId, int groupId)
     {
@@ -21,16 +22,16 @@ namespace Calloatti.HoomanStairs
       return groupId != HoomanStairsManager.StairsGroupId;
     }
 
-    // FIX: Mirror the block logic to prevent the "it wasn't blocked" exception
-    // Targets Timberborn.Navigation.NavMeshSource.UnblockEdge(int, int, int)
-    [HarmonyPatch("Timberborn.Navigation.NavMeshSource", "UnblockEdge")]
+    // Strongly-typed patch for NavMeshSource.UnblockEdge
+    [HarmonyPatch(typeof(NavMeshSource), nameof(NavMeshSource.UnblockEdge))]
     [HarmonyPrefix]
     public static bool UnblockEdge_Source_Prefix(int startNodeId, int endNodeId, int groupId)
     {
       return groupId != HoomanStairsManager.StairsGroupId;
     }
 
-    [HarmonyPatch("Timberborn.Navigation.DistrictObstacleService", "IsSetObstacle")]
+    // Strongly-typed patch for DistrictObstacleService.IsSetObstacle
+    [HarmonyPatch(typeof(DistrictObstacleService), nameof(DistrictObstacleService.IsSetObstacle))]
     [HarmonyPostfix]
     public static void IsSetObstacle_Postfix(int nodeId, ref bool __result)
     {
@@ -43,6 +44,7 @@ namespace Calloatti.HoomanStairs
     // FIX: Vanilla Edge-Case Crash
     // If a building's visual slots are disabled (e.g., by clipping into adjacent stacked walls), 
     // FixedSlotManager natively crashes. We bypass the crash and let SlotManager use its native unassigned pool.
+    // (Leaving "OnEntererAdded" as a string just in case it is an explicit/private interface implementation)
     [HarmonyPatch(typeof(FixedSlotManager), "OnEntererAdded")]
     [HarmonyPrefix]
     public static bool FixedSlotManager_OnEntererAdded_Prefix(FixedSlotManager __instance, object sender, EntererAddedEventArgs e, SlotManager ____slotManager)
@@ -52,7 +54,8 @@ namespace Calloatti.HoomanStairs
       return false; // Skip the original method so it never throws the exception
     }
 
-    [HarmonyPatch("Timberborn.PathSystem.ConnectionService", "IsEntranceInDirectionAt")]
+    // Strongly-typed patch for ConnectionService.IsEntranceInDirectionAt
+    [HarmonyPatch(typeof(ConnectionService), nameof(ConnectionService.IsEntranceInDirectionAt))]
     [HarmonyPostfix]
     public static void IsEntranceInDirectionAt_Postfix(Vector3Int entranceCoordinates, Vector3Int doorstepCoordinates, ref bool __result)
     {
@@ -62,6 +65,27 @@ namespace Calloatti.HoomanStairs
       {
         __result = true;
       }
+    }
+
+    // --- NEW: Idle Wander Crash Fix ---
+    // Strongly-typed patch to intercept the out-of-bounds crash when an idle beaver is trapped inside the stairs.
+    [HarmonyPatch(typeof(DistrictRandomDestinationPicker), nameof(DistrictRandomDestinationPicker.GetRandomDestination), new Type[] { typeof(District), typeof(Vector3) })]
+    [HarmonyFinalizer]
+    public static Exception GetRandomDestination_Finalizer(Exception __exception, ref Vector3 __result, Vector3 coordinates)
+    {
+      // If the vanilla game crashes because the list of valid destinations was completely empty...
+      if (__exception is ArgumentOutOfRangeException)
+      {
+        // We safely swallow the exception and tell the beaver to just stand still
+        // at their current coordinates until a new task is assigned.
+        __result = coordinates;
+
+        // Returning null suppresses the exception so the game doesn't crash!
+        return null;
+      }
+
+      // If it was some other unexpected error, let it crash normally so we don't hide real bugs.
+      return __exception;
     }
 
     /*

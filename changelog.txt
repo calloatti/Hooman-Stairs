@@ -1,3 +1,5 @@
+1.0.8
+Fixed crash by patching DistrictRandomDestinationPicker
 1.0.7
 Traverses 3x2 roofs
 1.0.6
