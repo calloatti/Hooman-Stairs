@@ -1,18 +1,36 @@
-1.0.8
-Fixed crash by patching DistrictRandomDestinationPicker
-1.0.7
-Traverses 3x2 roofs
-1.0.6
-Fix for crash There's no cached flow field by properly using StartCachingTerrainFlowField/StopCachingTerrainFlowField
-1.0.5
-Fixed crash by properly patching Timberborn.Navigation.NavMeshSource.BlockEdge/UnblockEdge for StairsGroupId
-1.0.4
-Uses group for node, less beaver clipping thru walls
-1.0.3
-Removed debug logging
-1.0.2
-Fixed visual bug paths not connecting to doors.
-1.0.1
-Fixed an edge case crash with FixedSlotManager
-1.0.0
-Initial release
+--------------------------------------------------------------------------------
+Game Version: 1.0.0.0
+Mod Version: 1.0.8
+- Fixed crash by patching DistrictRandomDestinationPicker
+--------------------------------------------------------------------------------
+Game Version: 1.0.0.0
+Mod Version: 1.0.7
+- Traverses 3x2 roofs
+--------------------------------------------------------------------------------
+Game Version: 1.0.0.0
+Mod Version: 1.0.6
+- Fix for crash There's no cached flow field by properly using StartCachingTerrainFlowField/StopCachingTerrainFlowField
+--------------------------------------------------------------------------------
+Game Version: 1.0.0.0
+Mod Version: 1.0.5
+- Fixed crash by properly patching Timberborn.Navigation.NavMeshSource.BlockEdge/UnblockEdge for StairsGroupId
+--------------------------------------------------------------------------------
+Game Version: 1.0.0.0
+Mod Version: 1.0.4
+- Uses group for node, less beaver clipping thru walls
+--------------------------------------------------------------------------------
+Game Version: 1.0.0.0
+Mod Version: 1.0.3
+- Removed debug logging
+--------------------------------------------------------------------------------
+Game Version: 1.0.0.0
+Mod Version: 1.0.2
+- Fixed visual bug paths not connecting to doors.
+--------------------------------------------------------------------------------
+Game Version: 1.0.0.0
+Mod Version: 1.0.1
+- Fixed an edge case crash with FixedSlotManager
+--------------------------------------------------------------------------------
+Game Version: 1.0.0.0
+Mod Version: 1.0.0
+- Initial release
