@@ -1,36 +1,27 @@
---------------------------------------------------------------------------------
-Game Version: 1.0.0.0
-Mod Version: 1.0.8
+Game Version: 1.0.0.0 - Mod Version: 1.0.8
 - Fixed crash by patching DistrictRandomDestinationPicker
 --------------------------------------------------------------------------------
-Game Version: 1.0.0.0
-Mod Version: 1.0.7
+Game Version: 1.0.0.0 - Mod Version: 1.0.7
 - Traverses 3x2 roofs
 --------------------------------------------------------------------------------
-Game Version: 1.0.0.0
-Mod Version: 1.0.6
+Game Version: 1.0.0.0 - Mod Version: 1.0.6
 - Fix for crash There's no cached flow field by properly using StartCachingTerrainFlowField/StopCachingTerrainFlowField
 --------------------------------------------------------------------------------
-Game Version: 1.0.0.0
-Mod Version: 1.0.5
+Game Version: 1.0.0.0 - Mod Version: 1.0.5
 - Fixed crash by properly patching Timberborn.Navigation.NavMeshSource.BlockEdge/UnblockEdge for StairsGroupId
 --------------------------------------------------------------------------------
-Game Version: 1.0.0.0
-Mod Version: 1.0.4
+Game Version: 1.0.0.0 - Mod Version: 1.0.4
 - Uses group for node, less beaver clipping thru walls
 --------------------------------------------------------------------------------
-Game Version: 1.0.0.0
-Mod Version: 1.0.3
+Game Version: 1.0.0.0 - Mod Version: 1.0.3
 - Removed debug logging
 --------------------------------------------------------------------------------
-Game Version: 1.0.0.0
-Mod Version: 1.0.2
+Game Version: 1.0.0.0 - Mod Version: 1.0.2
 - Fixed visual bug paths not connecting to doors.
 --------------------------------------------------------------------------------
-Game Version: 1.0.0.0
-Mod Version: 1.0.1
+Game Version: 1.0.0.0 - Mod Version: 1.0.1
 - Fixed an edge case crash with FixedSlotManager
 --------------------------------------------------------------------------------
-Game Version: 1.0.0.0
-Mod Version: 1.0.0
+Game Version: 1.0.0.0 - Mod Version: 1.0.0
 - Initial release
+--------------------------------------------------------------------------------
