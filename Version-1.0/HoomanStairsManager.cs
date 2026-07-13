@@ -220,24 +220,14 @@ namespace Calloatti.HoomanStairs
       bool isWalkable = _terrainService.Underground(belowPreOutside) || _stackableBlockService.IsStackableBlockAt(belowPreOutside);
       Vector3Int? topPreOutside = isWalkable ? (Vector3Int?)topPreOutsideRaw : null;
 
-      var removeMethod = AccessTools.Method(typeof(BlockObject), "RemoveFromService");
-      var addMethod = AccessTools.Method(typeof(BlockObject), "AddToService");
-
-      removeMethod?.Invoke(topBuilding, null);
+      topBuilding.RemoveFromService();
 
       Vector3Int offset = topBuilding.PositionedEntrance.Direction2D.ToOffset();
       Vector3Int deepInside = topBuilding.PositionedEntrance.Coordinates - offset;
 
+      topBuilding.PositionedEntrance = new PositionedEntrance(deepInside, topBuilding.PositionedEntrance.Direction2D);
 
-      var constructor = AccessTools.Constructor(typeof(PositionedEntrance), new Type[] { typeof(Vector3Int), typeof(Timberborn.Coordinates.Direction2D) });
-      if (constructor != null)
-      {
-        PositionedEntrance fakedEntrance = (PositionedEntrance)constructor.Invoke(new object[] { deepInside, topBuilding.PositionedEntrance.Direction2D });
-        var property = AccessTools.Property(typeof(BlockObject), nameof(BlockObject.PositionedEntrance));
-        property?.SetValue(topBuilding, fakedEntrance, null);
-      }
-
-      addMethod?.Invoke(topBuilding, null);
+      topBuilding.AddToService();
 
       Vector3Int topInside = topBuilding.PositionedEntrance.DoorstepCoordinates;
       Vector3Int topOutside = topBuilding.PositionedEntrance.Coordinates;
