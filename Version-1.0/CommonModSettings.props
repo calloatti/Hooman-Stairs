@@ -127,12 +127,12 @@
 
   </ItemGroup>
 
-<Target Name="PreBuild" BeforeTargets="PreBuildEvent">
-    <Exec Command="powershell -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\..\tools\prebuild.ps1&quot; -ProjectDir &quot;$(MSBuildProjectDirectory)&quot; -TargetDir &quot;$(TargetDir.TrimEnd('\'))&quot;" /> 
+  <Target Name="PreBuild" BeforeTargets="PreBuildEvent">
+    <Exec Command="powershell -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)prebuild.ps1&quot; -ProjectFullPath &quot;$(MSBuildProjectFullPath)&quot; -TargetDir &quot;$(TargetDir.TrimEnd('\'))&quot;" /> 
   </Target>
 
   <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-    <Exec Command="powershell -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\..\tools\postbuild.ps1&quot; -ProjectDir &quot;$(MSBuildProjectDirectory)&quot; -TargetDir &quot;$(TargetDir.TrimEnd('\'))&quot;" /> 
+    <Exec Command="powershell -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)postbuild.ps1&quot; -ProjectFullPath &quot;$(MSBuildProjectFullPath)&quot; -TargetDir &quot;$(TargetDir.TrimEnd('\'))&quot;" /> 
   </Target>
 
 </Project>
