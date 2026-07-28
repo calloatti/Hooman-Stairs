@@ -57,6 +57,35 @@ Building finished → OnEnteredFinishedStateEvent → ScanTargetBuilding()
 - **Ref-counted nodes** — `AddNode`/`RemoveNode` use increment/decrement. A node is only removed from the registry when its count reaches 0. Never directly clear the registry without cleanup.
 - **No localization** — This mod has no user-facing UI strings. No localization files needed.
 - **Harmony patches target specific game classes** — patches are organized by target class in `HoomanStairsPatches.cs` (not split into separate files, following existing convention).
+- **CitizenUnstucker roof bug (base-game)** — `CitizenUnstucker.TryUnstuckAndKeepDistrict` (`Timberborn.GameDistricts.cs:753-772`) is the game's built-in beaver rescue. When a beaver is "globally unreachable" (pathfinding fails or nav mesh timing race), this fires and checks `IsStuckInsideFinishedBuilding`. If true, it searches `Deltas.Neighbors26Vector3Int` (26 positions in a 3x3x3 cube) for the first neighbor where `DistrictIsGloballyReachable` returns true. The array is ordered Z=-1 (below) first, then Z=0, then Z=1. Neighbors below and on the same level are inside occupied/restricted blocks → unreachable. The first hit is often `(0,0,1)` — the roof surface. Once on the roof, `IsStuckInsideFinishedBuilding` returns false (roof is not "inside" a building), so subsequent unstuck attempts do nothing, and the beaver gets unassigned from its district.
+
+  **Trigger conditions**: `UnassignDistrictIfCutOff()` runs on every nav mesh update AND every time a beaver's pathfinding task returns Failure. A beaver inside ANY building whose path task momentarily fails can trigger this — it is NOT mod-specific.
+
+  **Proof**: Reproduced on a plain ground-level building with no mod intervention. Placing a decorative roof over the stuck beaver via dev mode instantly unstucks it — `IsStuckInsideFinishedBuilding` becomes true again, the unstucker finds a valid neighbor, and teleports the beaver. Removing the decorative roof leaves the beaver trapped on an open roof surface.
+
+## Proposed Fix — CitizenUnstucker Patch (All Buildings)
+
+### Problem
+The vanilla `CitizenUnstucker` teleports beavers to the first globally-reachable 26-neighbor position, which is almost always the roof `(0,0,1)`. Once on the roof, the beaver is permanently stuck and gets unassigned from its district.
+
+### Solution
+A `[HarmonyPrefix]` on `CitizenUnstucker.TryUnstuckAndKeepDistrict` that runs before the original (returns false to skip it for our cases). The patch:
+1. Checks if the beaver is globally unreachable
+2. Finds the **nearest position that is part of the district's ROAD network** (the road network, not terrain — since roads are always walkable and connected to the district)
+3. Teleports the beaver there
+
+### Search Strategy
+- Start from the beaver's grid position
+- Spiral outward in expanding diamond rings at the beaver's Z-level
+- For each position, check `_navigationCachingService` or `_districtService.DistrictIsGloballyReachable(district, worldPos)` using a road-specific check
+- First reachable road position wins
+- Fallback: expand Z-range if nothing found
+
+### Implementation
+New Harmony patch in `HoomanStairsPatches.cs`. Prefix returns false only when our logic handles it. Falls through to original (and other mods' patches like Beavers For Real) for unhandled cases.
+
+### Compatibility
+Vanilla `TryFindReachablePosition` searches 26 neighbors with `DistrictIsGloballyReachable` (uses `_globalReachabilityService.AreaReachable` → `InstantTerrainNavMeshGraph`). Our patch replaces this with a road-network-targeted spiral search. Other mods patching the same method will still run as postfixes and see our `__result`.
 
 ## Build & Deploy
 - Build via `dotnet build` in `Version-1.0/` or Visual Studio `.slnx`.
@@ -64,3 +93,35 @@ Building finished → OnEnteredFinishedStateEvent → ScanTargetBuilding()
 - `CommonModSettings.props` defines Timberborn game DLL references, publicizer configuration, and output paths.
 - Game assemblies path: `C:\Program Files (x86)\Steam\steamapps\common\timberborn_main\Timberborn_Data\Managed`
 - Harmony DLL path: Steam workshop content folder.
+
+## Game Source Access & Research
+
+### Version-to-Path Mapping
+Each mod's `Version-{X.Y}` folder targets game version `{X}.{Y}.x.x`. The suffix after the version number (e.g., `-b769e88-sw`) does not matter — match on the major.minor prefix using a wildcard.
+
+| Version Folder | Game Version | Decompiled (glob) | Ripped (glob) | Docs (glob) |
+|---|---|---|---|---|
+| `Version-1.0` | `1.0.x.x` | `timberborn-decompiled-1.0.*` | `timberborn-ripped-1.0.*` | `timberborn-docs-1.0.*` |
+| `Version-1.1` | `1.1.x.x` | `timberborn-decompiled-1.1.*` | `timberborn-ripped-1.1.*` | _(none yet)_ |
+
+### Base Path
+All game reference directories live under `C:\Users\calloatti\source\repos\`.
+
+### Available Directory Types
+| Prefix | Contents |
+|---|---|
+| `timberborn-decompiled-{version}*` | Decompiled C# game source |
+| `timberborn-ripped-{version}*` | Ripped Unity assets (sprites, shaders, prefabs) |
+| `timberborn-docs-{version}*` | Per-assembly documentation markdown |
+
+### Decompiled Directory Structure
+Inside each decompiled folder:
+  * `EditorDll`
+  * `EditorUI`
+  * `Localizations`
+  * `Shaders`
+  * `UI`
+  * `Blueprints`
+
+### Version Checking
+Target game versions can be confirmed via `_version.txt` at the root of each decompiled folder. Compare this to the `MinimumGameVersion` value in the mod's `manifest.json`.
