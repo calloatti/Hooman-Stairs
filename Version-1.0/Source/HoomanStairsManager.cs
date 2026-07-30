@@ -1,17 +1,14 @@
 ﻿using Bindito.Core;
-using HarmonyLib;
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using Timberborn.BlockSystem;
-using Timberborn.BuildingsNavigation;
+using Timberborn.Buildings;
+using Timberborn.Common;
 using Timberborn.Coordinates;
 using Timberborn.EntitySystem;
 using Timberborn.Navigation;
-using Timberborn.PlayerDataSystem;
 using Timberborn.SingletonSystem;
-using Timberborn.TerrainSystem;
 using Timberborn.UILayoutSystem;
 using UnityEngine;
 
@@ -23,57 +20,38 @@ namespace Calloatti.HoomanStairs
     public BlockObject BottomBuilding;
     public List<Vector3Int> GridPath;
     public List<NavMeshEdge> InjectedEdges = new List<NavMeshEdge>();
-    public EdgeKey FakePathEdge;
   }
 
   public partial class HoomanStairsManager : IPostLoadableSingleton, IDisposable
   {
-    // FIX 1: Initialize to -1 so it doesn't accidentally match Group 0 on map load
     public static int StairsGroupId { get; private set; } = -1;
 
     private readonly IBlockService _blockService;
-    private readonly ITerrainService _terrainService;
-    private readonly StackableBlockService _stackableBlockService;
     private readonly EventBus _eventBus;
     private readonly EntityComponentRegistry _entityComponentRegistry;
     private readonly INavMeshService _navMeshService;
-    private readonly NavMeshGroupService _navMeshGroupService;
     private readonly INavigationCachingService _navigationCachingService;
+    private readonly NavMeshGroupService _navMeshGroupService;
 
     private readonly List<StairConnection> _activeConnections = new List<StairConnection>();
-    private GameObject _rendererHolder;
-    private PathRenderer _renderer;
-
-    private bool _debugNodes = false;
-    private bool _debugLines = false;
-    private bool _debugCarving = false;
 
     [Inject]
     public HoomanStairsManager(
         IBlockService blockService,
-        ITerrainService terrainService,
-        StackableBlockService stackableBlockService,
         EventBus eventBus,
         EntityComponentRegistry entityComponentRegistry,
-        INavMeshService navMeshService, NavMeshGroupService navMeshGroupService,
-        INavigationCachingService navigationCachingService)
+        INavMeshService navMeshService, INavigationCachingService navigationCachingService, NavMeshGroupService navMeshGroupService)
     {
       _blockService = blockService;
-      _terrainService = terrainService;
-      _stackableBlockService = stackableBlockService;
       _eventBus = eventBus;
       _entityComponentRegistry = entityComponentRegistry;
       _navMeshService = navMeshService;
-      _navMeshGroupService = navMeshGroupService;
       _navigationCachingService = navigationCachingService;
+      _navMeshGroupService = navMeshGroupService;
     }
 
     public void PostLoad()
     {
-      LoadDebugSettings();
-      _rendererHolder = new GameObject("HoomanStairsRenderer");
-      _renderer = _rendererHolder.AddComponent<PathRenderer>();
-
       StairsGroupId = _navMeshGroupService.GetOrAddGroupId("HoomanStairs");
 
       _eventBus.Register(this);
@@ -82,37 +60,7 @@ namespace Calloatti.HoomanStairs
     public void Dispose()
     {
       _eventBus.Unregister(this);
-      if (_rendererHolder != null) UnityEngine.Object.Destroy(_rendererHolder);
       CleanupAllConnections();
-    }
-
-    private void LoadDebugSettings()
-    {
-      string configPath = Path.Combine(PlayerDataFileService.PlayerDataDirectory, "HoomanStairs.txt");
-
-      if (File.Exists(configPath))
-      {
-        string[] lines = File.ReadAllLines(configPath);
-        foreach (var line in lines)
-        {
-          var parts = line.Split('=');
-          if (parts.Length == 2)
-          {
-            string key = parts[0].Trim();
-            if (bool.TryParse(parts[1].Trim(), out bool value))
-            {
-              if (key == "DebugNodes") _debugNodes = value;
-              if (key == "DebugLines") _debugLines = value;
-              if (key == "DebugCarving") _debugCarving = value;
-            }
-          }
-        }
-      }
-      else
-      {
-        Directory.CreateDirectory(PlayerDataFileService.PlayerDataDirectory);
-        File.WriteAllText(configPath, "DebugNodes=false\nDebugLines=false\nDebugCarving=false");
-      }
     }
 
     [OnEvent]
@@ -128,7 +76,6 @@ namespace Calloatti.HoomanStairs
     public void OnBuildingRemoved(ExitedFinishedStateEvent @event)
     {
       RemoveConnectionsForBuilding(@event.BlockObject);
-      if (_renderer != null) _renderer.ClearPathData(@event.BlockObject);
     }
 
     public void RefreshAllBuildings()
@@ -215,49 +162,37 @@ namespace Calloatti.HoomanStairs
       var bottomFootprint = centralBelow.PositionedBlocks.GetOccupiedCoordinates().ToList();
       var validDropColumns = validDropColumnsByCandidate[centralBelow];
 
-      Vector3Int topPreOutsideRaw = topBuilding.PositionedEntrance.Coordinates;
-      Vector3Int belowPreOutside = topPreOutsideRaw + new Vector3Int(0, 0, -1);
-      bool isWalkable = _terrainService.Underground(belowPreOutside) || _stackableBlockService.IsStackableBlockAt(belowPreOutside);
-      Vector3Int? topPreOutside = isWalkable ? (Vector3Int?)topPreOutsideRaw : null;
-
-      topBuilding.RemoveFromService();
-
-      Vector3Int offset = topBuilding.PositionedEntrance.Direction2D.ToOffset();
-      Vector3Int deepInside = topBuilding.PositionedEntrance.Coordinates - offset;
-
-      topBuilding.PositionedEntrance = new PositionedEntrance(deepInside, topBuilding.PositionedEntrance.Direction2D);
-
-      topBuilding.AddToService();
-
-      Vector3Int topInside = topBuilding.PositionedEntrance.DoorstepCoordinates;
-      Vector3Int topOutside = topBuilding.PositionedEntrance.Coordinates;
+      Vector3Int topDoorstep = topBuilding.PositionedEntrance.DoorstepCoordinates;
+      Vector3Int bottomDoorstep = centralBelow.PositionedEntrance.DoorstepCoordinates;
+      Vector3Int bottomOutside = centralBelow.PositionedEntrance.Coordinates;
 
       HashSet<Vector2Int> top2DFootprint = new HashSet<Vector2Int>();
       foreach (var c in footprint) top2DFootprint.Add(new Vector2Int(c.x, c.y));
       HashSet<Vector2Int> bottom2DFootprint = new HashSet<Vector2Int>();
       foreach (var c in bottomFootprint) bottom2DFootprint.Add(new Vector2Int(c.x, c.y));
 
-      // Pass the safe validDropColumns to the pathfinder
       if (!HoomanStairsPathfinder.TryGenerateInternalPath(
-          topPreOutside, topOutside, topInside,
-          centralBelow.PositionedEntrance.DoorstepCoordinates,
-          centralBelow.PositionedEntrance.Coordinates,
+          topDoorstep,
+          bottomDoorstep,
+          bottomOutside,
           top2DFootprint, bottom2DFootprint, validDropColumns,
-          out List<Vector3Int> gridPath, out List<Vector3> path))
+          out List<Vector3Int> gridPath, out var _))
       {
         return;
       }
 
+      Vector3Int topOutside = topBuilding.PositionedEntrance.Coordinates;
       StairConnection conn = new StairConnection { TopBuilding = topBuilding, BottomBuilding = centralBelow, GridPath = gridPath };
-
-      conn.FakePathEdge = new EdgeKey(topPreOutsideRaw, topPreOutsideRaw - offset);
-      HoomanStairsRegistry.FakePathEdges.Add(conn.FakePathEdge);
 
       _activeConnections.Add(conn);
 
       foreach (var node in gridPath)
       {
         if (IsInNavMesh(node)) HoomanStairsRegistry.AddNode(GetNodeId(node));
+      }
+      if (IsInNavMesh(topOutside))
+      {
+        HoomanStairsRegistry.AddNode(GetNodeId(topOutside));
       }
 
       int group = StairsGroupId;
@@ -270,22 +205,42 @@ namespace Calloatti.HoomanStairs
         conn.InjectedEdges.Add(eDown);
         conn.InjectedEdges.Add(eUp);
       }
-
-      HoomanStairsRegistry.TopBuildings.Add(topBuilding);
-      _navigationCachingService.StartCachingRoadFlowField(topOutside);
-      _navigationCachingService.StartCachingTerrainFlowField(topOutside);
-
-      var buildingAccessible = topBuilding.GetComponent<Timberborn.Buildings.BuildingAccessible>();
-      if (buildingAccessible != null && buildingAccessible.Accessible != null)
+      // Bridge the top building's Coordinates to DoorstepCoordinates with our protected
+      // group so the road network can reach the entrance through the stair path.
+      // Only needed if the building wasn't already bridged as a bottom building by the
+      // connection above (that path already ends at this building's Coordinates).
+      if (!_activeConnections.Any(c => c.BottomBuilding == topBuilding))
       {
-        Vector3 inside = NavigationCoordinateSystem.GridToWorld(topOutside);
-        buildingAccessible.Accessible.SetAccesses(new List<Vector3> { inside });
+        var eDown = NavMeshEdge.CreateGrouped(topOutside, gridPath[0], group, true, 0.6f);
+        var eUp = NavMeshEdge.CreateGrouped(gridPath[0], topOutside, group, true, 0.8f);
+        _navMeshService.AddEdge(eDown);
+        _navMeshService.AddEdge(eUp);
+        conn.InjectedEdges.Add(eDown);
+        conn.InjectedEdges.Add(eUp);
       }
 
-      RefreshBuildingNavMesh(topBuilding);
-      RefreshBuildingNavMesh(centralBelow);
+      HoomanStairsRegistry.TopBuildings.Add(topBuilding);
 
-      if (_renderer != null) _renderer.UpdatePathData(topBuilding, path, _debugNodes, _debugLines, _debugCarving);
+      // Redirect accessible to DoorstepCoordinates so beavers path directly inside
+      var buildingAccessible = topBuilding.GetComponent<BuildingAccessible>();
+      if (buildingAccessible != null)
+      {
+        var accessible = buildingAccessible.Accessible;
+        if (accessible != null)
+        {
+          Vector3 doorstepWorld = CoordinateSystem.GridToWorldCentered(topBuilding.PositionedEntrance.DoorstepCoordinates);
+          accessible.SetAccesses(Enumerables.One(doorstepWorld));
+          var doorstepGrid = topBuilding.PositionedEntrance.DoorstepCoordinates;
+          _navigationCachingService.StartCachingRoadFlowField(doorstepGrid);
+          if (topBuilding.GetComponent<Timberborn.BuildingRange.BuildingWithTerrainRange>() != null)
+          {
+            _navigationCachingService.StartCachingTerrainFlowField(doorstepGrid);
+          }
+        }
+      }
+
+      // Track the top outside cell for cleanup
+      gridPath.Add(topOutside);
     }
 
     private void RemoveConnectionsForBuilding(BlockObject blockObject)
@@ -301,12 +256,20 @@ namespace Calloatti.HoomanStairs
             if (IsInNavMesh(node)) HoomanStairsRegistry.RemoveNode(GetNodeId(node));
           }
 
-          Vector3Int topOutside = conn.TopBuilding.PositionedEntrance.Coordinates;
-          _navigationCachingService.StopCachingRoadFlowField(topOutside);
-          _navigationCachingService.StopCachingTerrainFlowField(topOutside);
+          if (conn.TopBuilding == blockObject)
+          {
+            var entrance = conn.TopBuilding.PositionedEntrance;
+            if (entrance != null)
+            {
+              _navigationCachingService.StopCachingRoadFlowField(entrance.DoorstepCoordinates);
+              if (conn.TopBuilding.GetComponent<Timberborn.BuildingRange.BuildingWithTerrainRange>() != null)
+              {
+                _navigationCachingService.StopCachingTerrainFlowField(entrance.DoorstepCoordinates);
+              }
+            }
+          }
 
           HoomanStairsRegistry.TopBuildings.Remove(conn.TopBuilding);
-          HoomanStairsRegistry.FakePathEdges.Remove(conn.FakePathEdge);
           _activeConnections.RemoveAt(i);
         }
       }
@@ -317,21 +280,19 @@ namespace Calloatti.HoomanStairs
       foreach (var conn in _activeConnections)
       {
         foreach (var edge in conn.InjectedEdges) _navMeshService.RemoveEdge(edge);
+        var entrance = conn.TopBuilding.PositionedEntrance;
+        if (entrance != null)
+        {
+          _navigationCachingService.StopCachingRoadFlowField(entrance.DoorstepCoordinates);
+          if (conn.TopBuilding.GetComponent<Timberborn.BuildingRange.BuildingWithTerrainRange>() != null)
+          {
+            _navigationCachingService.StopCachingTerrainFlowField(entrance.DoorstepCoordinates);
+          }
+        }
       }
       _activeConnections.Clear();
       HoomanStairsRegistry.StairNodeIds.Clear();
       HoomanStairsRegistry.TopBuildings.Clear();
-      HoomanStairsRegistry.FakePathEdges.Clear();
-    }
-
-    private void RefreshBuildingNavMesh(BlockObject building)
-    {
-      var navMesh = building.GetComponent<BuildingNavMesh>();
-      if (navMesh != null)
-      {
-        navMesh.BlockAndRemoveFromNavMesh();
-        navMesh.UnblockAndAddToNavMesh();
-      }
     }
 
     private bool IsTopValidBuilding(BlockObject b) =>

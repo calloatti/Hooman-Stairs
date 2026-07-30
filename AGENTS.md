@@ -17,42 +17,51 @@ Intermediate roofs: `Roof3x2.Folktails` / `Roof3x2.IronTeeth` (traversed through
 ## Source Architecture (`Version-1.0/Source/`)
 
 | File | Role |
-|---|---|
+|---|---|---|
 | `ModStarter.cs` | Entry point — Harmony.PatchAll() |
 | `ModConfigurator.cs` | DI configurator `[Context("Game")]` — binds `HoomanStairsManager` as singleton |
 | `HoomanStairsManager.cs` | Core singleton (IPostLoadableSingleton, IDisposable). Scans buildings, injects/removes nav mesh Edges, manages StairConnections. |
 | `HoomanStairsManager.Visualizer.cs` | Partial class with `PathRenderer` MonoBehaviour for debug wireframe rendering |
 | `HoomanStairsPathfinder.cs` | Static BFS pathfinder — generates 2D path within building footprints + vertical drop |
 | `HoomanStairsPatches.cs` | All Harmony patches |
-| `HoomanStairsRegistry.cs` | Static ref-counted registry for stair nodes, top buildings, fake path edges + `EdgeKey` struct |
+| `HoomanStairsRegistry.cs` | Static ref-counted registry for stair nodes and top building set |
 
-## The Six Pillars (Architecture)
-1. **Manhattan/BFS path** — Pathfinder walks top outside → top inside → 2D BFS within footprint → vertical drop → bottom inside → bottom outside. All path nodes are *inside* building footprints only.
+## The Four Pillars (Architecture)
+1. **Inside-to-inside BFS path** — Pathfinder walks top `DoorstepCoordinates` → 2D BFS within footprint → vertical drop → bottom `DoorstepCoordinates` → bottom `Coordinates`. All path nodes are *inside* building footprints only. The path ends at the bottom building's `Coordinates` (outside, ground-level road-connected), creating a continuous route from road → bottom entrance → stair path → top interior.
 2. **Central Registry** — `HoomanStairsRegistry` uses ref-counted `Dictionary<int, int>` for nodes so destroying one connection doesn't break another that shares nodes.
 3. **AutoWall bypass** — Prefix patch on `NavMeshSource.BlockEdge`/`UnblockEdge` returns false for `StairsGroupId`, preventing the game from walling off stair paths.
 4. **District bypass** — Postfix patch on `DistrictObstacleService.IsSetObstacle` returns false for stair nodes, letting the orange path line flow through.
-5. **Entrance shift** — Top building's entrance is moved inward (`PositionedEntrance.Coordinates - offset`). If the door hangs over air, building interaction point shifts inside.
-6. **Live refresh** — `RefreshBuildingNavMesh` calls `BlockAndRemoveFromNavMesh` + `UnblockAndAddToNavMesh` to regenerate walls with Harmony intercepting.
 
 ## Key Data Flow
 ```
 Building finished → OnEnteredFinishedStateEvent → ScanTargetBuilding()
   → checks stacked buildings below, skipping Roof3x2
-  → shifts top entrance inward if no solid floor outside
-  → HoomanStairsPathfinder.TryGenerateInternalPath()
+  → HoomanStairsPathfinder.TryGenerateInternalPath(topDoorstep, bottomDoorstep, bottomOutside, ...)
   → registers nodes in HoomanStairsRegistry (ref-counted)
   → injects NavMeshEdge pairs (grouped = StairsGroupId, down cost 0.6, up cost 0.8)
-  → Starts caching road+terrain flow field at top outside
-  → Overrides BuildingAccessible accesses to the shifted-inside coordinate
+  → if top building was never a bottom: injects Coordinates↔DoorstepCoordinates bridge edge (StairsGroupId)
+  → marks top building in HoomanStairsRegistry.TopBuildings
+  → redirects Accessible.Accesses to DoorstepCoordinates so beavers path directly inside (no mid-air)
+  → caches a road flow field at DoorstepCoordinates (useless but prevents GetFlowFieldAtNode throw)
   → Refreshes nav mesh on both buildings
 ```
 
 ## Known Pitfalls & Lessons Learned
 - **`StairsGroupId` must start at -1** (not 0) to avoid collision with Group 0 on map load.
-- **EdgeKey is direction-agnostic** — `Equals` checks both `(A,B)` and `(B,A)`. This matters for `FakePathEdges` used in `ConnectionService.IsEntranceInDirectionAt`.
+- **`Accessible.Accesses` redirect to `DoorstepCoordinates`** — `ScanTargetBuilding` redirects the top building's accessible position from `Coordinates` (outside, mid-air) to `DoorstepCoordinates` (inside) so beavers path directly inside without the "exit to mid-air then re-enter" visual. The redirect is done via a `[HarmonyPrefix]` on `Accessible.SetAccesses` that checks `HoomanStairsRegistry.TopBuildings.Contains(blockObject)` — so only already-connected buildings are redirected. Newly constructed buildings get the redirect in `ScanTargetBuilding` after the connection is established (the prefix fires again via the manual `SetAccesses` call, and the building is now in `TopBuildings`). During saved-game load, buildings aren't in `TopBuildings` yet, so `StartCaching` caches at `Coordinates`; the redirect happens later in `RefreshAllBuildings` → `ScanTargetBuilding`.
+- **`BuildingCachingFlowField.StartCaching`** (`Timberborn.BuildingsNavigation.cs:844-851`) runs during `OnEnterFinishedState` for every building. It calls `_navigationCachingService.StartCachingRoadFlowField(_accessCoordinates)` where `_accessCoordinates = WorldToGridInt(Accessible.Accesses.Single())`. This creates an empty cache entry keyed by node ID in `RoadFlowFieldCache.FlowFieldCache` (a `Dictionary<int, CacheEntry>`). The cache is NOT filled during this call — it just reserves a slot with ref-counting. The actual flow field is filled lazily on first pathfinding query.
+- **`FindRoadPathCached` throws on cache miss** (`Timberborn.Navigation.cs:6199-6206`) — `NavigationService.FindRoadPath` calls `PathfindingService.FindRoadPathCached(start, end, ...)` which calls `_roadFlowFieldCache.GetFlowFieldAtNode(WorldToId(start))`. If no cache entry exists at the start node's ID, it throws `InvalidOperationException`. This means every building's accessible position MUST have a cached flow field entry, or any pathfinding FROM that building crashes. The cache entry can exist but remain unfilled (harmless — `FindPathInFlowField` returns false on unfilled flow fields).
+- **`FillFlowField` requires district road flow field** (`Timberborn.Navigation.cs:6942`) — `RoadFlowFieldGenerator.FillFlowField` checks `roadNavMeshGraph.IsOnNavMesh(startNodeId) && limitingFlowField.HasNode(startNodeId)`. The `limitingFlowField` comes from `DistrictMap.GetDistrictRoadFlowFieldByRoadNodeId` which returns the empty flow field for non-road nodes (interior tiles). Interior tiles like `DoorstepCoordinates` fail the second check, so flow fields at interior nodes can never be filled. This is why the cache at `DoorstepCoordinates` is useless but necessary (to prevent the throw).
+- **Cache at DoorstepCoordinates must be manually created** — Since `StartCaching` runs before `TopBuildings` is populated (during load), it caches at `Coordinates` (the default accessible). After `ScanTargetBuilding` redirects to `DoorstepCoordinates`, a new cache entry must be manually created via `_navigationCachingService.StartCachingRoadFlowField(DoorstepCoordinates)` in `ScanTargetBuilding`. If the building has `BuildingWithTerrainRange`, a terrain flow field cache must also be created with `StartCachingTerrainFlowField` — otherwise `FindTerrainPathCached` throws on the missing terrain cache. `INavigationCachingService` is injected into `HoomanStairsManager` for this purpose.
+- **`PositionedEntrance` design rationale** — `Coordinates` = OUTSIDE (beaver parks here, on walkable nav mesh). `DoorstepCoordinates` = INSIDE (beaver teleports here after enter animation).
+- **Topmost building needs a `Coordinates→DoorstepCoordinates` bridge edge with `StairsGroupId`** — The game's default entrance edge uses Group 0, which gets wall-blocked. Without a protected-group bridge, the top building's entrance is unreachable from the stair path. `ScanTargetBuilding` adds this bridge edge for every top building that wasn't already a bottom in another connection.
+- **Middle buildings get the bridge edge for free** — When building C is the bottom of connection D→C, D's path ends with `C.Doorstep → C.Coordinates` (the last edge pair). This IS the bridge edge, already using `StairsGroupId`. So middle buildings never need an explicit bridge injection.
 - **`FixedSlotManager.OnEntererAdded` crash** — Patched with a prefix that calls `slotManager.AddEnterer` directly and returns false. The crash happens when visual slots are disabled by clipping.
 - **`DistrictRandomDestinationPicker.GetRandomDestination` crash** — Patched with a Finalizer that catches `ArgumentOutOfRangeException` (empty destination list) and returns current coordinates + null exception.
 - **`PositionedEntrance.Coordinates` = OUTSIDE** the building; **`.DoorstepCoordinates` = INSIDE**. This is opposite of what you might expect.
+- **`CoordinateSystem.GridToWorldCentered`** (`Coordinates.cs:254-257`) — `GridToWorld(Vector3Int)` swaps axes: `new Vector3(x, z, y)` (grid→Unity). `CenterWorld` adds `(0.5, 0, 0.5)` to center the tile. So the building interaction point (`Accessible`) defaults to the center of `Coordinates`'s tile — the tile just outside the door.
+- **Middle buildings handled automatically** — Buildings are built bottom-up. When B finishes above A, B scans DOWN to find A (B=top, A=bottom). When C finishes above B, C scans DOWN to find B (C=top, B=bottom). B ends up with two connections: top of B→A, bottom of C→B. The nav mesh edges overlap in B's interior, creating a continuous path C→B→A. No re-scan mechanism needed.
+- **Scanning direction is correct** — The newly-finished building is always the topmost (bottom-up construction). It scans downward, finding eligible buildings below that are already finished. No need to re-scan buildings above the newly finished one.
 - **Debug config** — `%USERPROFILE%/AppData/LocalLow/Mechanistry/Timberborn/HoomanStairs.txt` with `DebugNodes`, `DebugLines`, `DebugCarving` booleans.
 - **Ref-counted nodes** — `AddNode`/`RemoveNode` use increment/decrement. A node is only removed from the registry when its count reaches 0. Never directly clear the registry without cleanup.
 - **No localization** — This mod has no user-facing UI strings. No localization files needed.

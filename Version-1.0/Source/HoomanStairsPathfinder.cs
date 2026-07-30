@@ -8,45 +8,34 @@ namespace Calloatti.HoomanStairs
   public static class HoomanStairsPathfinder
   {
     public static bool TryGenerateInternalPath(
-        Vector3Int? topPreOutside,
-        Vector3Int topOutside,
-        Vector3Int topInside,
-        Vector3Int bottomInside,
+        Vector3Int topDoorstep,
+        Vector3Int bottomDoorstep,
         Vector3Int bottomOutside,
         HashSet<Vector2Int> topFootprint,
         HashSet<Vector2Int> bottomFootprint,
-        HashSet<Vector2Int> validDropColumns, // NEW: Safe drop zones!
+        HashSet<Vector2Int> validDropColumns,
         out List<Vector3Int> gridPath,
         out List<Vector3> path)
     {
       gridPath = new List<Vector3Int>();
       path = new List<Vector3>();
 
-      // NEW: Only allow the bridge column to occur inside safely pre-checked columns!
       var intersection = validDropColumns.Intersect(bottomFootprint).ToList();
       if (intersection.Count == 0) return false;
 
-      // Prefer going down in the center: maximize neighbors in the footprints, then farthest from the door
-      Vector2Int topInside2D = new Vector2Int(topInside.x, topInside.y);
+      Vector2Int topDoorstep2D = new Vector2Int(topDoorstep.x, topDoorstep.y);
       Vector2Int bridgeCol = intersection
           .OrderByDescending(c => GetNeighborCount(c, topFootprint) + GetNeighborCount(c, bottomFootprint))
-          .ThenByDescending(c => Vector2Int.Distance(c, topInside2D))
+          .ThenByDescending(c => Vector2Int.Distance(c, topDoorstep2D))
           .First();
 
-      // 0. Pre-Outside (if valid, prepend it to the path)
-      if (topPreOutside.HasValue)
-      {
-        AddNode(topPreOutside.Value, gridPath, path);
-      }
-
-      // 1. Outside to Inside
-      AddNode(topOutside, gridPath, path);
-      Vector3Int current = topInside;
+      // 1. Start at Top Doorstep
+      Vector3Int current = topDoorstep;
       AddNode(current, gridPath, path);
 
-      // 2. BFS from Top Inside to Common Footprint (bridgeCol)
+      // 2. BFS from Top Doorstep to Common Footprint (bridgeCol)
       var topPath2D = FindPath2D(new Vector2Int(current.x, current.y), bridgeCol, topFootprint);
-      if (topPath2D == null) return false; // Fails safely instead of walking outside
+      if (topPath2D == null) return false;
 
       foreach (var step in topPath2D)
       {
@@ -56,14 +45,14 @@ namespace Calloatti.HoomanStairs
 
       // 3. Drop Z at the Common Footprint
       int safety = 0;
-      while (current.z != bottomInside.z && safety++ < 100)
+      while (current.z != bottomDoorstep.z && safety++ < 100)
       {
-        current.z += (bottomInside.z > current.z) ? 1 : -1;
+        current.z += (bottomDoorstep.z > current.z) ? 1 : -1;
         AddNode(current, gridPath, path);
       }
 
-      // 4. BFS from Common Footprint to Bottom Inside
-      var bottomPath2D = FindPath2D(new Vector2Int(current.x, current.y), new Vector2Int(bottomInside.x, bottomInside.y), bottomFootprint);
+      // 4. BFS from Common Footprint to Bottom Doorstep
+      var bottomPath2D = FindPath2D(new Vector2Int(current.x, current.y), new Vector2Int(bottomDoorstep.x, bottomDoorstep.y), bottomFootprint);
       if (bottomPath2D == null) return false;
 
       foreach (var step in bottomPath2D)

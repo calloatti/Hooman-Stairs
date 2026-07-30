@@ -1,3 +1,5 @@
+* Game Version: 1.0.0.0 - Mod Version: 2.0.0
+- Now mod shifts Accessible.Accesses instead of PositionedEntrance.Coordinates, less problematic and invasive.
 * Game Version: 1.0.0.0 - Mod Version: 1.0.9
 - Removed reflection code
 * Game Version: 1.0.0.0 - Mod Version: 1.0.8
