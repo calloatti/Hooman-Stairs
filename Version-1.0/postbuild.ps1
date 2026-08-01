@@ -49,6 +49,6 @@ foreach ($file in $SpecialFiles) {
 
 # 6. Execution Step 4: Sanitation Pass
 Write-Host "PostBuild: Cleaning up unwanted build scripts and markdown files in $DestModFolderRoot"
-Get-ChildItem -Path $DestModFolderRoot -Include "*.ps1", "AGENTS.md" -Recurse | Remove-Item -Force -ErrorAction SilentlyContinue
+Get-ChildItem -Path $DestModFolderRoot -Include "*.ps1", "AGENTS.md", "*.zip" -Recurse | Remove-Item -Force -ErrorAction SilentlyContinue
 
 Write-Host "PostBuild: Deployment complete."
