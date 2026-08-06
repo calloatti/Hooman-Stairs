@@ -159,6 +159,14 @@ namespace Calloatti.HoomanStairs
       float avgY = (float)candidates.Average(c => c.Coordinates.y);
       BlockObject centralBelow = candidates.OrderBy(c => Mathf.Pow(c.Coordinates.x - avgX, 2) + Mathf.Pow(c.Coordinates.y - avgY, 2)).First();
 
+      // SAFETY CHECK: Prevent merging two distinct, established districts (mimicking GateConflictDetector logic)
+      var topDistrict = topBuilding.GetComponent<Timberborn.GameDistricts.DistrictBuilding>()?.District;
+      var bottomDistrict = centralBelow.GetComponent<Timberborn.GameDistricts.DistrictBuilding>()?.District;
+      if (topDistrict != null && bottomDistrict != null && topDistrict != bottomDistrict)
+      {
+        return;
+      }
+
       var bottomFootprint = centralBelow.PositionedBlocks.GetOccupiedCoordinates().ToList();
       var validDropColumns = validDropColumnsByCandidate[centralBelow];
 
@@ -222,7 +230,7 @@ namespace Calloatti.HoomanStairs
       HoomanStairsRegistry.TopBuildings.Add(topBuilding);
 
       // Redirect accessible to DoorstepCoordinates so beavers path directly inside
-      var buildingAccessible = topBuilding.GetComponent<BuildingAccessible>();
+      var buildingAccessible = topBuilding.GetComponent<Timberborn.Buildings.BuildingAccessible>();
       if (buildingAccessible != null)
       {
         var accessible = buildingAccessible.Accessible;
@@ -296,15 +304,19 @@ namespace Calloatti.HoomanStairs
     }
 
     private bool IsTopValidBuilding(BlockObject b) =>
-        b.HasComponent<Timberborn.DwellingSystem.Dwelling>() ||
-        b.HasComponent<Timberborn.WorkSystem.Workplace>() ||
-        b.HasComponent<Timberborn.Stockpiles.Stockpile>() ||
-        b.HasComponent<Timberborn.Attractions.Attraction>();
+            !b.HasComponent<Timberborn.GameDistricts.DistrictCenter>() &&
+            !b.HasComponent<Timberborn.DistributionSystem.DistrictCrossing>() && (
+            b.HasComponent<Timberborn.DwellingSystem.Dwelling>() ||
+            b.HasComponent<Timberborn.WorkSystem.Workplace>() ||
+            b.HasComponent<Timberborn.Stockpiles.Stockpile>() ||
+            b.HasComponent<Timberborn.Attractions.Attraction>());
 
     private bool IsBottomValidBuilding(BlockObject b) =>
+        !b.HasComponent<Timberborn.GameDistricts.DistrictCenter>() &&
+        !b.HasComponent<Timberborn.DistributionSystem.DistrictCrossing>() && (
         b.HasComponent<Timberborn.DwellingSystem.Dwelling>() ||
         b.HasComponent<Timberborn.WorkSystem.Workplace>() ||
-        b.HasComponent<Timberborn.Stockpiles.Stockpile>();
+        b.HasComponent<Timberborn.Stockpiles.Stockpile>());
 
     private bool IsIntermediateRoof(BlockObject b)
     {
