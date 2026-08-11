@@ -6,7 +6,6 @@
     <LangVersion>10.0</LangVersion>
     <Nullable>disable</Nullable>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
-    <TimberbornPath>C:\Program Files (x86)\Steam\steamapps\common\timberborn_main\Timberborn_Data\Managed</TimberbornPath>
     <PublicizerRuntimeStrategies>Unsafe</PublicizerRuntimeStrategies>
     <Deterministic>true</Deterministic>
     <Version>1.0.0</Version>
@@ -14,6 +13,10 @@
     <AssemblyVersion>1.0.0.0</AssemblyVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <GenerateAssemblyInformationalVersionAttribute>false</GenerateAssemblyInformationalVersionAttribute>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <DebugType>embedded</DebugType>
   </PropertyGroup>
 
   <ItemGroup>
@@ -30,42 +33,82 @@
     <Publicize Include="Timberborn.AutomationBuildingsUI" />
     <Publicize Include="Timberborn.AutomationUI" />
     <Publicize Include="Timberborn.BatchControl" />
+    <Publicize Include="Timberborn.Beavers" />
+    <Publicize Include="Timberborn.BeaversUI" />
     <Publicize Include="Timberborn.BlockObjectModelSystem" />
+    <Publicize Include="Timberborn.BlockObjectPickingSystem" />
     <Publicize Include="Timberborn.BlockObjectTools" />
     <Publicize Include="Timberborn.BlockSystem" />
+    <Publicize Include="Timberborn.BlockObstacles" />
+    <Publicize Include="Timberborn.BlockingSystem" />
     <Publicize Include="Timberborn.BlueprintSystem" />
+    <Publicize Include="Timberborn.Bots" />
+    <Publicize Include="Timberborn.BotsUI" />
+    <Publicize Include="Timberborn.BuilderHubSystem" />
     <Publicize Include="Timberborn.BuilderPrioritySystem" />
     <Publicize Include="Timberborn.Buildings" />
     <Publicize Include="Timberborn.BuildingsNavigation" />
     <Publicize Include="Timberborn.BuildingsReachability" />
+    <Publicize Include="Timberborn.ConstructionGuidelines" />
+    <Publicize Include="Timberborn.CharactersUI" />
     <Publicize Include="Timberborn.CoreUI" />
+    <Publicize Include="Timberborn.CursorToolSystem" />
     <Publicize Include="Timberborn.DecalSystem" />
+    <Publicize Include="Timberborn.DecalSystemUI" />
     <Publicize Include="Timberborn.DwellingSystem" />
+    <Publicize Include="Timberborn.DwellingSystemUI" />
+    <Publicize Include="Timberborn.Emptying" />
     <Publicize Include="Timberborn.EntitySystem" />
+    <Publicize Include="Timberborn.Explosions" />
+    <Publicize Include="Timberborn.FactionSystem" />
     <Publicize Include="Timberborn.ForestryUI" />
     <Publicize Include="Timberborn.GameDistricts" />
+    <Publicize Include="Timberborn.GameFactionSystem" />
     <Publicize Include="Timberborn.GameSaveRepositorySystemUI" />
     <Publicize Include="Timberborn.Gathering" />
+    <Publicize Include="Timberborn.Goods" />
     <Publicize Include="Timberborn.GoodsUI" />
     <Publicize Include="Timberborn.IlluminationUI" />
     <Publicize Include="Timberborn.InventorySystem" />
     <Publicize Include="Timberborn.LevelVisibilitySystem" />
     <Publicize Include="Timberborn.LevelVisibilitySystemUI" />
+    <Publicize Include="Timberborn.MainMenuScene" />
     <Publicize Include="Timberborn.ModManagerScene" />
+    <Publicize Include="Timberborn.Modding" />
     <Publicize Include="Timberborn.ModelHiding" />
+    <Publicize Include="Timberborn.ModularShafts" />
     <Publicize Include="Timberborn.Navigation" />
     <Publicize Include="Timberborn.PathSystem" />
+    <Publicize Include="Timberborn.RecoveredGoodSystem" />
     <Publicize Include="Timberborn.Rendering" />
+    <Publicize Include="Timberborn.Reproduction" />
+    <Publicize Include="Timberborn.ResourceCountingSystem" />
+    <Publicize Include="Timberborn.SkySystem" />
     <Publicize Include="Timberborn.SlotSystem" />
     <Publicize Include="Timberborn.StockpileVisualization" />
     <Publicize Include="Timberborn.Stockpiles" />
     <Publicize Include="Timberborn.StockpilesUI" />
+    <Publicize Include="Timberborn.StatusSystem" />
     <Publicize Include="Timberborn.StorageBatchControl" />
+    <Publicize Include="Timberborn.TemplateAttachmentSystem" />
+    <Publicize Include="Timberborn.TemplateCollectionSystem" />
+    <Publicize Include="Timberborn.TerrainPhysics" />
     <Publicize Include="Timberborn.TerrainSystemRendering" />
+    <Publicize Include="Timberborn.TimbermeshAnimations" />
     <Publicize Include="Timberborn.ToolButtonSystem" />
+    <Publicize Include="Timberborn.TopBarSystem" />
+    <Publicize Include="Timberborn.UILayoutSystem" />
     <Publicize Include="Timberborn.WalkingSystem" />
+    <Publicize Include="Timberborn.Wandering" />
     <Publicize Include="Timberborn.WaterBuildings" />
     <Publicize Include="Timberborn.WaterBuildingsUI" />
+    <Publicize Include="Timberborn.WaterSystem" />
+    <Publicize Include="Timberborn.WorkerOutfitSystem" />
+    <Publicize Include="Timberborn.Wellbeing" />
+    <Publicize Include="Timberborn.WellbeingUI" />
+    <Publicize Include="Timberborn.WonderPlanes" />
+    <Publicize Include="Timberborn.WorkSystem" />
+    <Publicize Include="Timberborn.WorkSystemUI" />
   </ItemGroup>
   
   <ItemGroup>
@@ -106,6 +149,7 @@
     <None Update="AssetBundles\**\*"><CopyToOutputDirectory>Always</CopyToOutputDirectory></None>
     <None Update="Buildings\**\*"><CopyToOutputDirectory>Always</CopyToOutputDirectory></None>
     <None Update="Characters\**\*"><CopyToOutputDirectory>Always</CopyToOutputDirectory></None>
+    <None Update="Collections\**\*"><CopyToOutputDirectory>Always</CopyToOutputDirectory></None>
     <None Update="Configurations\**\*"><CopyToOutputDirectory>Always</CopyToOutputDirectory></None>
     <None Update="ConstructionBases\**\*"><CopyToOutputDirectory>Always</CopyToOutputDirectory></None>
     <None Update="CustomCursors\**\*"><CopyToOutputDirectory>Always</CopyToOutputDirectory></None>
