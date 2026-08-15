@@ -1,0 +1,4 @@
+* Game Version: 1.0.0.0 - Mod Version: 2.0.1
+- Fixed a fatal game crash caused by placing a District Center or District Crossing directly above a valid ground building (e.g., storage).
+- Fixed unintentional stair connections forming on District Centers and District Crossings by excluding them from the valid building candidate lists.
+- Added a strict district safety check: abort connections if the top and bottom buildings belong to different districts.

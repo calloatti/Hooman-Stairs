@@ -1,0 +1,30 @@
+Buildings now have hooman stairs inside of them.
+
+For generations, beavers relied on sprawling, clunky networks of external wooden stairs to reach the upper levels of their settlements. That was until a team of lodge-architects, excavating a particularly deep ruin, unearthed ancient "hooman" blueprints. They discovered a long-lost concept: the internal staircase. 
+
+[h3]What this mod does[/h3]
+This mod automatically generates internal navigation paths between stacked buildings. When you build a qualifying structure (Dwelling, Workplace, Storage, or Attraction) directly on top of another qualifying structure, internal stairs will seamlessly connect them. Beavers can enter the ground-floor building and walk entirely indoors to reach the upper floors, drastically reducing the need for external scaffolding and saving valuable settlement space.
+
+[h3]What this mod does not do[/h3]
+Beavers have to be able to reach the construction site, so you may have to build temporary scaffolding for buildings on top of other buildings.
+
+NOTE: This mod does not alter saved games, so it can be safely disabled. The internal stairs are added to buildings when loading a saved game, and when a new building is built.
+
+[h3]Related mods[/h3]
+Doorless building packs built to work with this mod:
+[list]
+[*] [url=https://steamcommunity.com/sharedfiles/filedetails/?id=3777308041]Hooman Stairs Buildings - Steam[/url] — doorless versions of 16 vanilla Housing and Storage buildings
+[*] [url=https://steamcommunity.com/sharedfiles/filedetails/?id=3777308440]Hooman Stairs Buildings NBS - Steam[/url] — doorless versions of 8 buildings from the New Building Styles mod (Cabins and Flats)
+[*] [url=https://mod.io/g/timberborn/m/3777308041#description]Hooman Stairs Buildings - modio[/url] — doorless versions of 16 vanilla Housing and Storage buildings
+[*] [url=https://mod.io/g/timberborn/m/3777308440#description]Hooman Stairs Buildings NBS - modio[/url] — doorless versions of 8 buildings from the New Building Styles mod (Cabins and Flats)
+[/list]
+
+[hr][/hr]
+[url=https://steamcommunity.com/sharedfiles/filedetails/?id=3682179025]Mods on Steam[/url]
+
+[url=https://mod.io/u/calloatti/?_sort=name]Mods on mod-dot-io[/url]
+
+[url=https://github.com/search?q=owner%3Acalloatti+sort%3Aname-asc+%22Timberborn+Mod%22&type=repositories]Mods on Github[/url]
+
+[url=https://github.com/calloatti/ModZips]Mod zip files[/url]
+
