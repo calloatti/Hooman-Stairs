@@ -68,6 +68,7 @@
     <Publicize Include="Timberborn.Gathering" />
     <Publicize Include="Timberborn.Goods" />
     <Publicize Include="Timberborn.GoodsUI" />
+    <Publicize Include="Timberborn.Illumination" />
     <Publicize Include="Timberborn.IlluminationUI" />
     <Publicize Include="Timberborn.InventorySystem" />
     <Publicize Include="Timberborn.LevelVisibilitySystem" />

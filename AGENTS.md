@@ -167,3 +167,8 @@ Inside each decompiled folder:
 
 ### Version Checking
 Target game versions can be confirmed via `_version.txt` at the root of each decompiled folder. Compare this to the `MinimumGameVersion` value in the mod's `manifest.json`.
+
+## Hard Rule
+DO NOT EVER TOUCH THE DEPLOY FOLDER.
+
+BUILD DOES EVERYTHING, NEVER EVER MESS WITH THE DEPLOY PROCESS.

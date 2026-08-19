@@ -9,6 +9,7 @@
 .scratch/
 *.zip
 *.rar
+*.cmd
 session-*
 *.meta
 !/.meta/

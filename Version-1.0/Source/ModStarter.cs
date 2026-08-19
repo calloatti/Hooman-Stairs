@@ -11,8 +11,7 @@ namespace Calloatti.HoomanStairs
     {
       Debug.Log("[HoomanStairs] IModStarter.StartMod");
 
-      Harmony harmony = new Harmony("calloatti.hoomanstairs");
-      harmony.PatchAll();
+new Harmony("Calloatti.HoomanStairs").PatchAll();
 
     }
   }

@@ -1,10 +1,10 @@
 {
   "ItemId": "3682012904",
-  "DepsFile": "C:/Users/calloatti/source/repos/Mods/Hooman Stairs/.meta/steam_deps.txt",
   "ContentFolder": "C:/Users/calloatti/Documents/Timberborn/Mods/Hooman Stairs",
-  "PreviewFile": "C:/Users/calloatti/Documents/Timberborn/Mods/Hooman Stairs/thumbnail.jpg",
-  "DescriptionFile": "C:/Users/calloatti/source/repos/Mods/Hooman Stairs/.meta/steam_description.txt",
-  "Title": "Hooman Stairs",
   "Visibility": "public",
-  "TagsFile": "C:/Users/calloatti/source/repos/Mods/Hooman Stairs/.meta/steam_tags.txt"
+  "DepsFile": "C:/Users/calloatti/source/repos/Mods/Hooman Stairs/.meta/steam_deps.txt",
+  "DescriptionFile": "C:/Users/calloatti/source/repos/Mods/Hooman Stairs/.meta/steam_description.txt",
+  "TagsFile": "C:/Users/calloatti/source/repos/Mods/Hooman Stairs/.meta/steam_tags.txt",
+  "Title": "Hooman Stairs",
+  "PreviewFile": "C:/Users/calloatti/Documents/Timberborn/Mods/Hooman Stairs/thumbnail.jpg"
 }
